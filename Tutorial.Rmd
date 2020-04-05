@@ -1,0 +1,250 @@
+---
+title: "Tutorial For BIO 324"
+output: github_document
+author: "Go Ogata, Will Snyder"
+---
+
+In this turtorial, we will walk you through how to use R for data science with an application to neuropathology. 
+We will:
+1. Demonstrate how to learn and explore a new package in R
+2. Highlight the utility in visualizing data
+3. Model how to perform statistics on your data
+
+To begin, press the green play button on the top right of each code chunk to run the chunk's code. First, we'll start by installing some packages that will be used in our analyses. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#Packages related to formating graphs and code
+if (!require("UsingR")) install.packages("UsingR"); library(UsingR)
+if (!require("cowplot")) install.packages("cowplot"); library(cowplot)
+if (!require("tidyverse")) install.packages("tidyverse"); library(tidyverse)
+if (!require("ggplot2")) install.packages("ggplot2"); library(ggplot2)
+if (!require("car")) install.packages("car"); library(car)
+
+#Packages related to displaying FRI scans
+if (!require("oro.nifti")) install.packages("oro.nifti"); library(oro.nifti)
+if (!require("imager")) install.packages("imager"); library(imager)
+```
+
+
+#RESEARCH QUESTION: Is gray matter thickness the same across brain folding pattern types?
+
+We will demonstrate the utility in visualizing data in R by looking at MRI brain scans and tracings of brain folds in the orbitofrontal cortex (OFC). The OFC exhibits 3 pattern types of brain folding, and we will investigate whether gray matter thickness varies across these pattern types.
+
+## Learning a new package to import a Brain scan and Brain fold tracings
+
+If you are intrested in applying R's computational power to your Research, it is vital to have the skills to learn new packages on the fly and being able to look up answers. In this portion of the tutrial we will go through the process of learning a new package that will allow us to import and analyze Brain scans.
+
+The first step that will be necessary for the analysis is knowing which package to learn. This can possibly be the most difficult step as there are many packages out there the do similiar things but are specialized in specific task. There can also be old packages that may no longer be used and are replaced by new more robust packages.
+
+So the **first step** of learning a package can be asking a question: 
+
+"How do you import **Nifti files** into R?"
+
+"Packages used with **Nifti files** in R?"
+
+While it may seem like an easy step, but you want to make sure to be concise so that the search result doesn't bring up some compilcated or unrelated results. Another reason why you may want to be concise and highlight a specific task is because we already have a specific file type to work with and these kind of file types are desgined with packages in mind.
+
+In our case we found the package "oro.nifti"(2)
+
+The **second step** of learning a package is looking up the manual for a package.
+
+There is a database called CRAN where most R packages are located in, and the convenient thing about it is all the commands and description can be looked up through this data base. 
+
+https://cran.r-project.org/web/packages/oro.nifti/oro.nifti.pdf
+
+and then familiarize yourself with the relavent command's parameter, function and output.
+
+The oro.nifiti package provides us a way to load the nifti files (useful for packaging 3D MRI data) to R using the command readNIfTI. Additionally this command is able to read from g zipped (.gz) files too. 
+
+
+The **third step** of learning a package is looking up specific code on the internet.
+
+This may have been the same source as first step, but now is the best to apply the knowledge and figure out how the command and others code works out with your data set.
+
+In this tutorial we will be using the brain scan file 'bias_corrected.nii.gz' and brain fold tracings file 'full_orbital_sulcus_t1dim.nii.gz' located in the same file as the rmd file.
+
+
+```{r Importing}
+
+#scan <- readNIfTI(<nifti file location>)
+scan <- readNIfTI('bias_corrected.nii.gz')
+sulci <- readNIfTI('full_orbital_sulcus_t1dim.nii.gz')
+
+```
+
+## Displaying the Data
+
+With the orthographic command from the previous package we are able to dispaly the brain scan in R. The image produced by the scan shows the 
+
+```{r Displaying the Brain Scans}
+orthographic(scan)
+```
+
+But in most case the default setting of centered in the middle file isn't enough. To move the access you can use the add the flag xyz = (x-axis,y-axis,z-axis). The x-plane is shown on the top right, y-plane is shown on the top-left and the z-plane is shown on the bottom left and the red lines shows the location of the plane in the other two planes
+
+
+```{r Displaying the Brain Scans with Settings}
+# Editing the location of the Cross Section
+orthographic(scan,xyz = c(125,125,125))
+
+# Editing the settings for the Cross Hairs
+orthographic(scan,crosshairs = F)
+orthographic(scan,col.crosshairs = "blue")
+```
+
+Once we learned how to display the brain scans, and we can use the the command for orthographic or the overlay command to see one specific cross section for a better look.
+
+```{r Overlaying the Brain Fold Tracings on the Scan}
+
+orthographic(scan,y = sulci, col.y = "green", col.crosshairs = "red", c(125,225,75))
+overlay(x = scan, y = sulci, z = 75, plot.type = "single", col.y = "green")
+
+```
+
+However, we forgot a step when editing the Brain Fold Tracing file. The NIfTI files are essentially 3-Dimensianal matrixes called Voxels and as of right now are large portions have a value of zero and the overlay is showing it with the solid green color. To fix this problem, you can edit the file so that every spot with a value of zero is changed to contain a NA so that the value becomes invisable for the overlay.
+
+
+```{r with the fixed value}
+sulci[sulci == 0] = NA
+
+orthographic(scan,y = sulci, col.y = "green", col.crosshairs = "red", c(125,225,75))
+
+overlay(x = scan, y = sulci, z = 85, plot.type = "single", col.y = "green")
+
+```
+
+
+This type of overlay can be particularly useful to quality check data. Sometimes the tracings are incomplete because this part of the brain lies so ventrally, making it hard to automatically trace the brain folds. You can even see nearby regions that are in the OFC brain region that are not traced in the image. So, we gave the courtesy of not making you scroll through every single brain in our 300 + hemisphere dataset, and we recorded subject IDs for tracings that were incomplete based on the quality checking with the overlay function. These subject IDs are all stored in remove_list and are converted to a string below.  
+```{r subjects to be removed from analysis}
+remove_list <- c(113417, 128026, 146937, 150423, 154835, 128329, 129331, 130720, 130922, 140420, 146532, 157336, 163836, 100408, 108121, 110007, 114116, 115825, 118831, 123723, 123925, 129331, 137431, 139435, 143830, 153227, 155938, 162935, 168341, 172332,116423, 116524, 124422, 125525, 139637, 146533, 153126, 163129, 175237, 115825, 173334, 121820, 128329, 129028, 137532, 145632, 159845, 164636)
+for(i in 1:length(remove_list)) remove_list[i] = toString(remove_list[i])
+```
+
+
+# Analysis of the Brain Files
+
+Next, we are going to compare mean gray matter thickness in brains across different patterns of brain folding. We have .csv files that stores the gray matter thickness values for brains that have been labeled with Type 1, 2, or 3 in their right or left hemisphere. We will start by creating a list of all these files' file-paths using the "dir" function. This will help us access and extract information from these .csv files later.
+
+```{r lists of paths to subject brain fold measurements}
+type_one_left_csv_list <- dir("turtorial_excel_sheets/one_l", full.names = TRUE)
+type_one_right_csv_list <- dir("turtorial_excel_sheets/one_r", full.names = TRUE)
+type_two_left_csv_list <- dir("turtorial_excel_sheets/two_l", full.names = TRUE)
+type_two_right_csv_list <- dir("turtorial_excel_sheets/two_r", full.names = TRUE)
+type_three_left_csv_list <- dir("turtorial_excel_sheets/three_l", full.names = TRUE)
+type_three_right_csv_list <- dir("turtorial_excel_sheets/three_r", full.names = TRUE)
+```
+
+
+From these files, we wish to extract the gray matter values associated with a pattern type on a given brain hemisphere. We will start by creating empty vectors to store all the gray matter values. 
+```{r creating vectors to hold gray matter values}
+type_one_gray_matter_vals <- rep(NA, length(type_one_left_csv_list) + length(type_one_right_csv_list))
+type_two_gray_matter_vals <- rep(NA, length(type_two_left_csv_list) + length(type_two_right_csv_list))
+type_three_gray_matter_vals <- rep(NA, length(type_three_left_csv_list) + length(type_three_right_csv_list))
+```
+
+
+Then, we will loop through each file to extract the gray matter volume associated with the brain folding pattern. You may not need to focus on this section as much in our turtorial, but it is important to have a grasp of whether data is read correctly. You can check to see if data is read correctly by actually opening one of the .csv files and looking for left or right orbitofrontal sulcus gray matter thickness values, and comparing those to what is recorded in our data below to ensure we extracted the data correctly. These values should all be around 2 to 6.
+
+Each "for loop" to extract data functions as follows: 
+1. Checking whether the file is supposed to be excluded from analysis.
+2. The file path is read as a csv, with semicolons as a delimiter (i.e. cells in the sheet are distinguished by semicolons)
+3. The "which" function finds the index where the sheet has either the left or right orbital sulcus metrics
+4. The gray matter thickness at that index is recorded and converted to a character and then to a number so math can be erformed on these values later.
+5. The first empty element in the gray matter values vector is where the value will be stored. So, by finding the minimum index where the gray matter values has an NA value, the index is found.
+6. The gray matter value is stored in the vector at this index.
+7. 1-5 is repeated for all subjects labeled with the same pattern type on the same brain hemisphere (yielding 6 for loops = 3 pattern types x 2 brain hemispheres)
+
+
+```{r} 
+getHemData <- function( dir, side ,grayMatter){
+        sulcus.side = ""
+        if(side == "Right"){
+            sulcus.side = "S.Or._right"
+        }else if( side == "Left" ){
+            sulcus.side = "S.Or._left"
+        }
+        for(sub in dir){
+            tmp_sheet <- read_delim(sub,delim = ";")
+            ind <- which(tmp_sheet$sulcus == sulcus.side)
+            gm_val <- as.numeric(as.character(tmp_sheet$GM_thickness[ind]))
+            first_NA <- min(which(is.na(grayMatter)))
+            grayMatter[first_NA] <- gm_val
+        }
+        return(grayMatter)
+}
+
+type_one_gray_matter_vals <- getHemData(type_one_left_csv_list,"Left",type_one_gray_matter_vals)
+type_one_gray_matter_vals <- getHemData(type_one_right_csv_list,"Right",type_one_gray_matter_vals)
+
+type_two_gray_matter_vals <- getHemData(type_two_left_csv_list,"Left",type_two_gray_matter_vals)
+type_two_gray_matter_vals <- getHemData(type_two_right_csv_list,"Right",type_two_gray_matter_vals)
+
+type_three_gray_matter_vals <- getHemData(type_three_left_csv_list,"Left",type_three_gray_matter_vals)
+type_three_gray_matter_vals <- getHemData(type_three_right_csv_list,"Right",type_three_gray_matter_vals)
+
+```
+
+These are the means for gray matter volume for each pattern. Notice how they are very similar.
+```{r comparing means across pattern types}
+mean(type_one_gray_matter_vals)
+mean(type_two_gray_matter_vals)
+mean(type_three_gray_matter_vals)
+```
+
+We can further visualize the distribution of gray matter thickness for each pattern type by creating side-by-side boxplots. ggplot2 is a good package for plotting data, as seen below.  To use ggplot to visualize the data, we need to first create a data frame (gm_df) that has all the gray matter thickness values in one column and all the corresponding pattern types in another column. The factor function can record the pattern type labels as a categorical variable, and the variable is repeated in the corresponding_pattern_types as many "times" as it is present in the all_gray_matter_vals vector, to help us create the data frame.
+
+```{r}
+all_gray_matter_vals <- c(type_one_gray_matter_vals, type_two_gray_matter_vals, type_three_gray_matter_vals)
+corresponding_pattern_types <- factor(rep(c("1", "2","3"), times= c(length(type_one_gray_matter_vals), length(type_two_gray_matter_vals), length(type_three_gray_matter_vals))))
+
+gm_df <- data.frame(
+    GM= all_gray_matter_vals,
+    Type= corresponding_pattern_types
+)
+
+
+
+ggplot(gm_df) + geom_boxplot(aes(x = Type, y = GM, fill = Type)) + ggtitle("Gray Matter Thickness by Pattern Type") + theme_cowplot()
+```
+
+
+If we want to compare whether these means are different using a parametric test (ANOVA),  we have to make sure each variable is distributed normally (i.e. follows a bell-shaped curve). The "simple.eda" function can help us depict the distribution. Additionally, the "shapiro.test" function can test whether a distribution is significantly different from a normal distribution, so the high p-values you will see below indicate that gray matter thickness is dristributed normally for each pattern type. Note that one of the p-values for the Shapiro test is relatively low though, so we will interpret results with some caution. Also note that the variance of the distributions are all similar. We can test this with the leveneTest function, which compares variances in different groups, and therefore the high p-value we witness indicates we cannot reject that the variances are equal. 
+
+```{r ANOVA requirements}
+simple.eda(type_one_gray_matter_vals)
+simple.eda(type_two_gray_matter_vals)
+simple.eda(type_three_gray_matter_vals)
+
+shapiro.test(type_one_gray_matter_vals)
+shapiro.test(type_two_gray_matter_vals)
+shapiro.test(type_three_gray_matter_vals)
+
+var(type_one_gray_matter_vals)
+var(type_two_gray_matter_vals)
+var(type_three_gray_matter_vals)
+
+
+leveneTest(GM ~ Type, data = gm_df)
+```
+
+Below is the ANOVA test to show that gray matter values do not significantly differ across brain pattern types. ANOVA is a test to see whether the means of three or more quantitative variables are not the same, given the variables are indpenendent, have similar variance, and are independent of each other. Since we meet these assumptions, we can proceed with the parametric ANOVA test.
+
+
+
+Finally, the aov function creates a model in which gray matter (GM) depends on (~) pattern type (Type), and the anova function is able to calculate the probability that we would find our observations given the gray matter thickness is truly the same across pattern types. The high p-value shows that we fail to reject that gray matter thickness varies across pattern types. 
+
+```{r ANOVA}
+fm1 <- aov(GM~Type, data=gm_df)
+anova(fm1)
+```
+
+
+This result is interesting! A high p-value is not always upsetting. Many studies use gray matter in the brain to compare patient and control groups. However, our results show that pattern types of brain folding convey information that is not also conveyed by changes in gray matter. We cannot go as far to claim that this study gives evidence for there being no variation in gray matter by pattern type, but rather we failed to find evidence to suggest otherwise. Overall, since certain patterns of brain folding have been associated with psychiatric condtions, understanding these brain folding patterns has clinical utility. 
+
+
+Acknowledgements
+=========================
+1.https://cran.r-project.org/web/packages/oro.nifti/oro.nifti.pdf
+2.https://cran.r-project.org/web/packages/neurobase/vignettes/neurobase.html
+
